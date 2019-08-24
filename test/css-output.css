@@ -1,0 +1,9 @@
+.selector,
+a,
+#id {
+  bla: black;
+  blu: blue;
+  bottom: 0;
+  top: 100px;
+  zeta: false;
+}

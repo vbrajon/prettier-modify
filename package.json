@@ -1,0 +1,11 @@
+{
+  "name": "prettier-modify",
+  "version": "1.0.0",
+  "description": "Prettier wrapper to also modify ast.",
+  "bin": {
+    "prettier-modify": "cli.js"
+  },
+  "dependencies": {
+    "prettier": "^1.18.2"
+  }
+}
