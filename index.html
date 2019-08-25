@@ -1,0 +1,127 @@
+<style>
+  body { margin: 0; }
+  main { display: flex;flex-direction: column;height: 100vh; }
+  .tabs { width: 100%;max-height: fit-content;display: flex;font-size: 2em;font-weight: 600; }
+  .tabs div { flex: 1;margin: 10px; }
+  .content { flex: 1;display: flex;flex-wrap: wrap; }
+  textarea { flex: 1;resize: none;margin: -1px;font-size: 16px;white-space: pre; }
+</style>
+<main>
+  <div class="tabs">
+    <div>Options</div>
+    <div>Input</div>
+    <div>AST</div>
+    <div>Output</div>
+  </div>
+  <div class="content">
+    <textarea class="options" v-model="options"></textarea>
+    <textarea class="input" v-model="input"></textarea>
+    <textarea class="ast" :value="ast" disabled></textarea>
+    <textarea class="output" :value="output" disabled></textarea>
+  </div>
+</main>
+<script>
+  function format(text, options = {}, { parser, subparser, plugin, pre, mutate, post, parse, print } = {}) {
+    if (!parser) parser = options.parser
+    if (!plugin) plugin = ['babylon', 'graphql', 'html', 'markdown', 'postcss', 'typescript', 'yaml'].find(p => p.includes(parser)) || { babel: 'babylon', json: 'babylon', scss: 'postcss', less: 'postcss', angular: 'html', vue: 'html', jade: 'html' }[parser]
+    const wrapper = options.plugins[plugin]
+    const traverse = (node, level = 0) => {
+      if (!node || typeof node.type !== 'string') return
+      if (mutate) mutate(node)
+      // console.log('  '.repeat(level) + node.type)
+      Object.keys(node).map(k => {
+        if (Array.isArray(node[k])) return node[k].map(n => traverse(n, level + 1) || n)
+        return traverse(node[k], level + 1)
+      })
+    }
+
+    if (!wrapper.parsers[parser]._parse) wrapper.parsers[parser]._parse = wrapper.parsers[parser].parse
+    wrapper.parsers[parser].parse = (text, parsers, opts) => {
+      const ast = wrapper.parsers[parser]._parse(text, parsers, Object.assign(opts, options || {}))
+      traverse(ast)
+      /* HACK */vm.ast = JSON.stringify(ast, null, 2)
+      return ast
+    }
+
+    options.parser = options.plugins.find((v, k) => k.includes(options.parser)) || options.parser
+    if (pre) text = pre(text)
+    text = prettier.format(text, options)
+    if (post) text = post(text)
+
+    return text
+  }
+
+  const dependencies = [
+    'https://unpkg.com/vue@2.6.10/dist/vue.js',
+    'https://cdn.jsdelivr.net/gh/vbrajon/rawjs/raw.js',
+    'https://unpkg.com/prettier@1.18.2/standalone.js',
+    [
+      'https://unpkg.com/prettier@1.18.2/parser-html.js',
+      'https://unpkg.com/prettier@1.18.2/parser-angular.js',
+      'https://unpkg.com/prettier@1.18.2/parser-babylon.js',
+      'https://unpkg.com/prettier@1.18.2/parser-postcss.js',
+      'https://unpkg.com/prettier@1.18.2/parser-markdown.js',
+      'https://unpkg.com/prettier@1.18.2/parser-yaml.js',
+    ],
+  ]
+  const inject = url =>
+    new Promise((resolve, reject) => {
+      const el = document.createElement(url.includes('.css') ? 'link' : 'script')
+      if (url.includes('.css')) el.rel = 'stylesheet'
+      el[url.includes('.css') ? 'href' : 'src'] = url
+      el.onload = resolve
+      el.onerror = reject
+      document.head.appendChild(el)
+    })
+  const download = arr => arr && arr.length && Promise.all(arr.filter(url => !Array.isArray(url)).map(inject)).then(() => download(arr.filter(url => Array.isArray(url)).flat(1)))
+  download(dependencies).then(() => {
+    raw()
+    new Vue({
+      el: 'main',
+      data: {
+        options: `{
+    parser: 'css', // babel, html, markdown, yaml > HACK to detect language
+    modifiers: {
+      css: {
+        options: { singleQuote: false }, // This will override prettier options or overrides
+        mutate: node => {
+          if (node.type === 'css-rule') {
+            node.nodes = node.nodes
+              // This will remove duplicates
+              .reduceRight((acc, v) => {
+                if (!acc.some(x => x.prop === v.prop)) acc.push(v)
+                return acc
+              }, [])
+              // This will sort properties alphabetically
+              .sort((a, b) => (a.prop > b.prop ? 1 : -1))
+          }
+        },
+      },
+    },
+  }`,
+        input: `.selector, a, #id {
+  bottom: 0;
+  top: 100px;
+  zeta: false;
+  blu: badblue;
+  blu: blue;
+  bla: black; }`,
+        ast: '',
+      },
+      computed: {
+        output() {
+          /* HACK */window.vm = this
+          this.ast = ''
+          try {
+            const options = eval('(' + this.options + ')')
+            const modifier = options.modifiers[options.parser] || {}
+            return format(this.input, { ...options, ...modifier.options, plugins: prettierPlugins }, modifier)
+          } catch(e) {
+            console.error(e)
+            return e.stack || e
+          }
+        },
+      },
+    })
+  })
+</script>
