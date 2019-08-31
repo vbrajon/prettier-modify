@@ -1,7 +1,7 @@
 {
   "name": "prettier-modify",
   "version": "1.0.0",
-  "description": "Prettier wrapper to also modify ast.",
+  "main": "prettier-modify.js",
   "bin": {
     "prettier-modify": "cli.js"
   },

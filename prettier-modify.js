@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 const prettier = require('prettier')
 
-async function format(text, options = {}, { parser, plugin, pre, mutate, post, parse, print }) {
-  if (!parser) parser = options.ext
+async function format(text, { ext }) {
+  const config = await prettier.resolveConfig('file.' + ext)
+  const modifier = (config.modifiers || {})[ext] || {}
+  let { parser, plugin, pre, mutate, post, parse, print, options } = modifier
+  options = { ...config, ...options }
+  if (!parser) parser = ext
   if (!plugin) plugin = ['parser-babylon', 'parser-graphql', 'parser-html', 'parser-markdown', 'parser-postcss', 'parser-typescript', 'parser-yaml'].find(p => p.includes(parser)) || { babel: 'parser-babylon', json: 'parser-babylon', scss: 'parser-postcss', less: 'parser-postcss', angular: 'parser-html', vue: 'parser-html', jade: 'parser-html' }[parser]
   const wrapper = require(require.resolve('prettier').replace('index', plugin))
   const traverse = (node, level = 0) => {
